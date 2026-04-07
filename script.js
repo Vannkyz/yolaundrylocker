@@ -1,458 +1,399 @@
-// ==================== GLOBAL VARIABLES ====================
-const TOTAL_LOKER = 40;
+// State Management
 let currentLoker = 1;
-let lokerData = {};
+let allData = null;
+let syncInterval = null;
+let isSaving = false;
 
-// ==================== LOCAL STORAGE ====================
-const STORAGE_KEY = 'loker_app_data';
+// DOM Elements
+const lokerNavList = document.getElementById('lokerNavList');
+const lokerNumber = document.getElementById('lokerNumber');
+const namaCustomer = document.getElementById('namaCustomer');
+const pinLoker = document.getElementById('pinLoker');
+const statusLoker = document.getElementById('statusLoker');
+const tanggalLoker = document.getElementById('tanggalLoker');
+const petugasInput = document.getElementById('petugasInput');
+const selectPetugas = document.getElementById('selectPetugas');
+const uploadFoto = document.getElementById('uploadFoto');
+const previewFoto = document.getElementById('previewFoto');
+const dataDisplay = document.getElementById('dataDisplay');
+const btnSave = document.getElementById('btnSave');
+const btnClearForm = document.getElementById('btnClearForm');
+const btnClearAllData = document.getElementById('btnClearAllData');
+const syncStatus = document.getElementById('syncStatus');
+const modalZoom = document.getElementById('modalZoom');
+const zoomImage = document.getElementById('zoomImage');
 
-function loadFromLocalStorage() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-        lokerData = JSON.parse(saved);
-        console.log('Data loaded from localStorage');
-    } else {
-        // Initialize empty data
-        for (let i = 1; i <= TOTAL_LOKER; i++) {
-            lokerData[i] = {
-                id: i,
-                nama: '',
-                pin: '',
-                status: 'belum',
-                tanggal: '',
-                petugas: '',
-                foto: ''
-            };
-        }
-    }
-    updateTotalFilled();
-    renderLokerGrid();
-    displayCurrentLoker();
-}
-
-function saveToLocalStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(lokerData));
-    updateTotalFilled();
-    renderLokerGrid();
-}
-
-// ==================== UI FUNCTIONS ====================
-
-function updateTotalFilled() {
-    let count = 0;
-    for (let i = 1; i <= TOTAL_LOKER; i++) {
-        if (lokerData[i] && lokerData[i].nama && lokerData[i].nama !== '') {
-            count++;
-        }
-    }
-    document.getElementById('totalFilled').textContent = `${count}/${TOTAL_LOKER}`;
-}
-
-function renderLokerGrid() {
-    const grid = document.getElementById('lokerGrid');
-    grid.innerHTML = '';
-    
-    for (let i = 1; i <= TOTAL_LOKER; i++) {
-        const btn = document.createElement('button');
-        btn.className = `loker-btn ${currentLoker === i ? 'active' : ''}`;
-        
-        const data = lokerData[i];
-        if (data && data.nama && data.nama !== '') {
-            btn.classList.add('has-data');
-        }
-        
-        btn.innerHTML = `<i class="fas fa-door-closed"></i><span>${i}</span>`;
-        btn.onclick = () => {
-            currentLoker = i;
-            renderLokerGrid();
-            displayCurrentLoker();
-            document.getElementById('lokerNumber').textContent = i;
-            clearFormOnly();
-        };
-        
-        grid.appendChild(btn);
-    }
-}
-
-function displayCurrentLoker() {
-    const data = lokerData[currentLoker] || {
-        nama: '', pin: '', status: 'belum', tanggal: '', petugas: '', foto: ''
-    };
-    
-    // Update status chip
-    const statusChip = document.getElementById('lokerStatusChip');
-    const hasData = data.nama && data.nama !== '';
-    if (hasData) {
-        statusChip.innerHTML = '<i class="fas fa-circle"></i> Terisi';
-        statusChip.classList.add('filled');
-    } else {
-        statusChip.innerHTML = '<i class="fas fa-circle"></i> Kosong';
-        statusChip.classList.remove('filled');
-    }
-    
-    // Update display values
-    document.getElementById('displayNama').textContent = data.nama || '-';
-    document.getElementById('displayPin').innerHTML = data.pin ? `<span class="pin-code">${escapeHtml(data.pin)}</span>` : '-';
-    
-    const statusHtml = data.status === 'sudah' 
-        ? '<span class="status-badge sudah"><i class="fas fa-check"></i> Sudah Diambil</span>'
-        : '<span class="status-badge belum"><i class="fas fa-clock"></i> Belum Diambil</span>';
-    document.getElementById('displayStatus').innerHTML = statusHtml;
-    
-    document.getElementById('displayTanggal').textContent = data.tanggal || '-';
-    document.getElementById('displayPetugas').textContent = data.petugas || '-';
-    
-    // Foto display
-    const fotoDisplay = document.getElementById('fotoDisplay');
-    if (data.foto && data.foto !== '') {
-        fotoDisplay.innerHTML = `<img src="${data.foto}" alt="Bukti Loker" onclick="openModal('${data.foto}', ${currentLoker})">`;
-    } else {
-        fotoDisplay.innerHTML = '<span class="no-foto"><i class="fas fa-camera-slash"></i> Tidak ada foto</span>';
-    }
-    
-    // Fill form
-    document.getElementById('namaCustomer').value = data.nama || '';
-    document.getElementById('pinLoker').value = data.pin || '';
-    document.getElementById('statusPengambilan').value = data.status || 'belum';
-    document.getElementById('tanggal').value = data.tanggal || '';
-    
-    // Set petugas from dropdown or saved data
-    const petugasSelect = document.getElementById('petugasSelect');
-    const namaPetugas = document.getElementById('namaPetugas');
-    if (petugasSelect.value) {
-        namaPetugas.value = petugasSelect.value;
-    } else if (data.petugas) {
-        namaPetugas.value = data.petugas;
-        petugasSelect.value = data.petugas;
-        updateActivePetugas(data.petugas);
-    } else {
-        namaPetugas.value = '';
-    }
-    
-    // Preview foto
-    const previewWrapper = document.getElementById('previewWrapper');
-    const fotoPreview = document.getElementById('fotoPreview');
-    if (data.foto) {
-        fotoPreview.src = data.foto;
-        previewWrapper.style.display = 'inline-block';
-    } else {
-        previewWrapper.style.display = 'none';
-    }
-}
-
-function updateActivePetugas(petugas) {
-    const activeDiv = document.getElementById('activePetugas');
-    if (petugas) {
-        activeDiv.innerHTML = `<i class="fas fa-user-check"></i><span>${petugas}</span>`;
-    } else {
-        activeDiv.innerHTML = `<i class="fas fa-user-clock"></i><span>Belum dipilih</span>`;
-    }
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function clearFormOnly() {
-    document.getElementById('namaCustomer').value = '';
-    document.getElementById('pinLoker').value = '';
-    document.getElementById('statusPengambilan').value = 'belum';
-    document.getElementById('fotoBukti').value = '';
-    document.getElementById('previewWrapper').style.display = 'none';
-    document.getElementById('fotoPreview').src = '';
-    document.getElementById('tanggal').value = '';
-    
-    const petugas = document.getElementById('petugasSelect').value;
-    if (petugas) {
-        document.getElementById('namaPetugas').value = petugas;
-    } else {
-        document.getElementById('namaPetugas').value = '';
-    }
-}
-
-// ==================== SAVE DATA ====================
-
-async function saveLokerData(event) {
-    event.preventDefault();
-    
-    const nama = document.getElementById('namaCustomer').value.trim();
-    const pin = document.getElementById('pinLoker').value.trim();
-    const status = document.getElementById('statusPengambilan').value;
-    const petugas = document.getElementById('petugasSelect').value;
-    const petugasFinal = petugas || document.getElementById('namaPetugas').value;
-    
-    // Validation
-    if (!nama) {
-        showToast('❌ Nama customer harus diisi!', 'error');
-        return;
-    }
-    if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) {
-        showToast('❌ PIN harus minimal 4 digit angka!', 'error');
-        return;
-    }
-    if (!petugasFinal) {
-        showToast('❌ Pilih petugas terlebih dahulu!', 'error');
-        return;
-    }
-    
-    const saveBtn = document.querySelector('.btn-primary');
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Menyimpan...';
-    
+// ========== FUNGSI GITHUB API ==========
+async function loadDataFromGitHub() {
     try {
-        const now = new Date();
-        const tanggalString = now.toLocaleString('id-ID', { 
-            day: '2-digit', month: '2-digit', year: 'numeric', 
-            hour: '2-digit', minute: '2-digit', second: '2-digit' 
+        syncStatus.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Mengambil data...';
+        syncStatus.className = 'sync-status syncing';
+        
+        const response = await fetch(API_URL, {
+            headers: {
+                'Authorization': `token ${GITHUB_CONFIG.token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+
+        if (response.status === 404) {
+            // File belum ada, buat baru
+            await createInitialData();
+            return;
+        }
+
+        const data = await response.json();
+        const content = atob(data.content);
+        allData = JSON.parse(content);
+        
+        // Update SHA untuk commit berikutnya
+        allData.sha = data.sha;
+        
+        updateUI();
+        syncStatus.innerHTML = '<i class="fas fa-check-circle"></i> Tersinkronasi';
+        syncStatus.className = 'sync-status synced';
+        
+        setTimeout(() => {
+            if (syncStatus.className !== 'syncing') {
+                syncStatus.style.opacity = '0';
+            }
+        }, 2000);
+    } catch (error) {
+        console.error('Error loading data:', error);
+        syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal sync, coba lagi';
+        syncStatus.className = 'sync-status error';
+        
+        // Fallback ke local storage jika offline
+        const localData = localStorage.getItem('loker_backup');
+        if (localData) {
+            allData = JSON.parse(localData);
+            updateUI();
+        }
+    }
+}
+
+async function createInitialData() {
+    try {
+        // Buat folder data dulu
+        const content = btoa(JSON.stringify(DEFAULT_DATA, null, 2));
+        
+        await fetch(API_URL, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${GITHUB_CONFIG.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: 'Initial data for lockers',
+                content: content
+            })
         });
         
-        let fotoUrl = lokerData[currentLoker]?.foto || '';
-        const fileInput = document.getElementById('fotoBukti');
-        if (fileInput.files.length > 0) {
-            const file = fileInput.files[0];
-            fotoUrl = await fileToBase64(file);
-        }
+        allData = { ...DEFAULT_DATA };
+        updateUI();
+    } catch (error) {
+        console.error('Error creating data:', error);
+        allData = { ...DEFAULT_DATA };
+        updateUI();
+    }
+}
+
+async function saveDataToGitHub() {
+    if (isSaving) return;
+    isSaving = true;
+    
+    try {
+        syncStatus.innerHTML = '<i class="fas fa-save"></i> Menyimpan...';
+        syncStatus.className = 'sync-status syncing';
+        syncStatus.style.opacity = '1';
         
-        lokerData[currentLoker] = {
-            id: currentLoker,
-            nama: nama,
-            pin: pin,
-            status: status,
-            tanggal: tanggalString,
-            petugas: petugasFinal,
-            foto: fotoUrl
+        allData.lastUpdated = new Date().toISOString();
+        const content = btoa(unescape(encodeURIComponent(JSON.stringify(allData, null, 2))));
+        
+        const body = {
+            message: `Update data loker ${currentLoker} - ${new Date().toLocaleString()}`,
+            content: content,
+            sha: allData.sha
         };
         
-        saveToLocalStorage();
+        const response = await fetch(API_URL, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${GITHUB_CONFIG.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
         
-        showToast(`✅ Data Loker ${currentLoker} berhasil disimpan!`, 'success');
+        const result = await response.json();
+        allData.sha = result.content.sha;
         
-        renderLokerGrid();
-        displayCurrentLoker();
-        clearFormOnly();
+        // Backup ke local storage
+        localStorage.setItem('loker_backup', JSON.stringify(allData));
+        
+        syncStatus.innerHTML = '<i class="fas fa-check-circle"></i> Tersimpan!';
+        syncStatus.className = 'sync-status synced';
+        
+        setTimeout(() => {
+            if (syncStatus.className !== 'syncing') {
+                syncStatus.style.opacity = '0';
+            }
+        }, 2000);
         
     } catch (error) {
-        console.error('Save error:', error);
-        showToast('❌ Terjadi kesalahan saat menyimpan data', 'error');
+        console.error('Error saving:', error);
+        syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal simpan';
+        syncStatus.className = 'sync-status error';
+        
+        // Backup ke local storage
+        localStorage.setItem('loker_backup', JSON.stringify(allData));
     } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = '<i class="fas fa-save"></i> Simpan Data';
+        isSaving = false;
     }
 }
 
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
-}
-
-function clearTotalForm() {
-    if (confirm(`⚠️ Hapus SEMUA data untuk Loker ${currentLoker}?\n\nData akan hilang permanen!`)) {
-        lokerData[currentLoker] = {
-            id: currentLoker,
-            nama: '',
-            pin: '',
-            status: 'belum',
-            tanggal: '',
-            petugas: '',
-            foto: ''
-        };
-        saveToLocalStorage();
-        clearFormOnly();
-        displayCurrentLoker();
-        renderLokerGrid();
-        showToast(`🗑️ Data Loker ${currentLoker} telah dihapus!`, 'success');
-    }
-}
-
-function deleteCurrentLokerData() {
-    if (confirm(`⚠️ Hapus SEMUA data untuk Loker ${currentLoker}?`)) {
-        clearTotalForm();
-    }
-}
-
-// ==================== SYNC FUNCTION ====================
-
-function syncData() {
-    showToast('🔄 Data tersimpan di localStorage. Untuk sync ke device lain, gunakan fitur Export/Import di bawah!', 'info');
-}
-
-// ==================== EXPORT/IMPORT FOR MULTI-DEVICE ====================
-
-function exportData() {
-    const dataStr = JSON.stringify(lokerData, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `loker_backup_${new Date().toISOString().slice(0,19)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('📥 Data berhasil diexport!', 'success');
-}
-
-function importData(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const imported = JSON.parse(e.target.result);
-            if (imported && typeof imported === 'object') {
-                lokerData = imported;
-                saveToLocalStorage();
-                renderLokerGrid();
-                displayCurrentLoker();
-                showToast('📤 Data berhasil diimport!', 'success');
-            } else {
-                throw new Error('Invalid data');
-            }
-        } catch (error) {
-            showToast('❌ File tidak valid!', 'error');
+// ========== FUNGSI UTAMA ==========
+function updateUI() {
+    if (!allData) return;
+    
+    // Update navigasi
+    renderNavButtons();
+    
+    // Update form dengan data loker saat ini
+    const lokerData = allData.lokers[currentLoker - 1];
+    if (lokerData) {
+        namaCustomer.value = lokerData.namaCustomer || '';
+        pinLoker.value = lokerData.pinLoker || '';
+        statusLoker.value = lokerData.status || 'belum';
+        tanggalLoker.value = lokerData.tanggal || '';
+        petugasInput.value = lokerData.petugas || '';
+        
+        // Tampilkan foto jika ada
+        if (lokerData.fotoBase64) {
+            previewFoto.innerHTML = `<img src="${lokerData.fotoBase64}" class="preview-img" onclick="zoomPhoto('${lokerData.fotoBase64}')">`;
+        } else {
+            previewFoto.innerHTML = '';
         }
-    };
-    reader.readAsText(file);
-}
-
-// ========== EXPORT/IMPORT BUTTONS (add to UI) ==========
-function addExportImportButtons() {
-    const header = document.querySelector('.main-header');
-    const buttonGroup = document.createElement('div');
-    buttonGroup.className = 'sync-group';
-    buttonGroup.style.display = 'flex';
-    buttonGroup.style.gap = '10px';
-    
-    const exportBtn = document.createElement('button');
-    exportBtn.className = 'sync-btn';
-    exportBtn.innerHTML = '<i class="fas fa-download"></i><span>Export</span>';
-    exportBtn.onclick = exportData;
-    
-    const importBtn = document.createElement('button');
-    importBtn.className = 'sync-btn';
-    importBtn.innerHTML = '<i class="fas fa-upload"></i><span>Import</span>';
-    
-    const importInput = document.createElement('input');
-    importInput.type = 'file';
-    importInput.accept = '.json';
-    importInput.style.display = 'none';
-    importInput.onchange = (e) => {
-        if (e.target.files[0]) importData(e.target.files[0]);
-        importInput.value = '';
-    };
-    importBtn.onclick = () => importInput.click();
-    
-    buttonGroup.appendChild(exportBtn);
-    buttonGroup.appendChild(importBtn);
-    buttonGroup.appendChild(importInput);
-    header.appendChild(buttonGroup);
-}
-
-// ==================== MODAL ZOOM ====================
-
-function openModal(imgSrc, lokerId) {
-    const modal = document.getElementById('imageModal');
-    const modalImg = document.getElementById('modalImg');
-    const modalCaption = document.getElementById('modalCaption');
-    modal.style.display = 'block';
-    modalImg.src = imgSrc;
-    modalCaption.textContent = `Foto Bukti Loker ${lokerId}`;
-}
-
-// ==================== TOAST ====================
-
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast ${type} show`;
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
-}
-
-// ==================== EVENT LISTENERS ====================
-
-document.getElementById('lokerForm').addEventListener('submit', saveLokerData);
-document.getElementById('clearFormBtn').addEventListener('click', clearTotalForm);
-document.getElementById('deleteDataBtn').addEventListener('click', deleteCurrentLokerData);
-document.getElementById('syncBtn').addEventListener('click', syncData);
-
-document.getElementById('petugasSelect').addEventListener('change', function(e) {
-    const petugas = e.target.value;
-    document.getElementById('namaPetugas').value = petugas;
-    updateActivePetugas(petugas);
-});
-
-// Upload area
-const uploadArea = document.getElementById('uploadArea');
-const fotoInput = document.getElementById('fotoBukti');
-
-uploadArea.addEventListener('click', () => fotoInput.click());
-
-uploadArea.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadArea.style.borderColor = 'var(--primary)';
-    uploadArea.style.background = 'var(--light)';
-});
-
-uploadArea.addEventListener('dragleave', (e) => {
-    e.preventDefault();
-    uploadArea.style.borderColor = 'var(--border)';
-    uploadArea.style.background = 'transparent';
-});
-
-uploadArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-        fotoInput.files = e.dataTransfer.files;
-        previewPhoto(file);
+        
+        // Update display data
+        displayData();
     }
-    uploadArea.style.borderColor = 'var(--border)';
-});
+}
 
-fotoInput.addEventListener('change', (e) => {
-    if (e.target.files[0]) {
-        previewPhoto(e.target.files[0]);
+function renderNavButtons() {
+    lokerNavList.innerHTML = '';
+    for (let i = 1; i <= 40; i++) {
+        const btn = document.createElement('button');
+        btn.className = `loker-nav-btn ${currentLoker === i ? 'active' : ''}`;
+        
+        const lokerData = allData.lokers[i - 1];
+        const hasData = lokerData && lokerData.namaCustomer;
+        
+        btn.innerHTML = `
+            <span class="loker-num">${i}</span>
+            ${hasData ? '<i class="fas fa-check-circle has-data"></i>' : ''}
+        `;
+        
+        btn.onclick = () => selectLoker(i);
+        lokerNavList.appendChild(btn);
+    }
+}
+
+function selectLoker(num) {
+    currentLoker = num;
+    lokerNumber.textContent = num;
+    renderNavButtons();
+    
+    const lokerData = allData.lokers[num - 1];
+    namaCustomer.value = lokerData.namaCustomer || '';
+    pinLoker.value = lokerData.pinLoker || '';
+    statusLoker.value = lokerData.status || 'belum';
+    tanggalLoker.value = lokerData.tanggal || '';
+    petugasInput.value = lokerData.petugas || '';
+    
+    if (lokerData.fotoBase64) {
+        previewFoto.innerHTML = `<img src="${lokerData.fotoBase64}" class="preview-img" onclick="zoomPhoto('${lokerData.fotoBase64}')">`;
+    } else {
+        previewFoto.innerHTML = '';
+    }
+    
+    displayData();
+}
+
+function displayData() {
+    const lokerData = allData.lokers[currentLoker - 1];
+    if (!lokerData) return;
+    
+    const hasData = lokerData.namaCustomer;
+    
+    if (!hasData) {
+        dataDisplay.innerHTML = '<p class="empty-data"><i class="fas fa-inbox"></i><br>Belum ada data untuk loker ini</p>';
+        return;
+    }
+    
+    dataDisplay.innerHTML = `
+        <div class="data-item">
+            <strong><i class="fas fa-user"></i> Nama:</strong> 
+            <span>${lokerData.namaCustomer || '-'}</span>
+        </div>
+        <div class="data-item">
+            <strong><i class="fas fa-tag"></i> PIN:</strong> 
+            <span>${lokerData.pinLoker || '-'}</span>
+        </div>
+        <div class="data-item">
+            <strong><i class="fas fa-check-circle"></i> Status:</strong> 
+            <span class="status-badge ${lokerData.status === 'sudah' ? 'status-taken' : 'status-pending'}">
+                ${lokerData.status === 'sudah' ? '✓ Sudah Diambil' : '⏳ Belum Diambil'}
+            </span>
+        </div>
+        <div class="data-item">
+            <strong><i class="fas fa-calendar"></i> Tanggal:</strong> 
+            <span>${lokerData.tanggal || '-'}</span>
+        </div>
+        <div class="data-item">
+            <strong><i class="fas fa-user-check"></i> Petugas:</strong> 
+            <span>${lokerData.petugas || '-'}</span>
+        </div>
+        ${lokerData.fotoBase64 ? `
+            <div class="data-item">
+                <strong><i class="fas fa-camera"></i> Foto Bukti:</strong>
+                <div class="saved-photo">
+                    <img src="${lokerData.fotoBase64}" class="saved-img" onclick="zoomPhoto('${lokerData.fotoBase64}')">
+                </div>
+            </div>
+        ` : ''}
+    `;
+}
+
+// ========== FUNGSI FORM ==========
+async function saveData() {
+    // Validasi PIN minimal 4 digit
+    const pin = pinLoker.value.trim();
+    if (pin && pin.length < 4) {
+        alert('PIN minimal 4 digit!');
+        return;
+    }
+    
+    // Validasi petugas
+    const petugas = selectPetugas.value;
+    if (!petugas) {
+        alert('Silakan pilih petugas terlebih dahulu!');
+        return;
+    }
+    
+    // Get current date
+    const now = new Date();
+    const tanggal = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
+    
+    // Update data
+    allData.lokers[currentLoker - 1] = {
+        ...allData.lokers[currentLoker - 1],
+        nomor: currentLoker,
+        namaCustomer: namaCustomer.value.trim(),
+        pinLoker: pin,
+        status: statusLoker.value,
+        tanggal: tanggal,
+        petugas: petugas,
+        fotoBase64: allData.lokers[currentLoker - 1]?.fotoBase64 || ''
+    };
+    
+    await saveDataToGitHub();
+    renderNavButtons();
+    displayData();
+    
+    // Reset upload foto jika sudah disimpan
+    uploadFoto.value = '';
+}
+
+function clearForm() {
+    namaCustomer.value = '';
+    pinLoker.value = '';
+    statusLoker.value = 'belum';
+    tanggalLoker.value = '';
+    // Petugas tetap dari dropdown
+    previewFoto.innerHTML = '';
+    uploadFoto.value = '';
+}
+
+async function clearAllData() {
+    if (confirm('PERINGATAN! Ini akan menghapus SEMUA data dari 40 loker. Lanjutkan?')) {
+        if (confirm('Data akan dihapus PERMANEN dari GitHub. Yakin?')) {
+            allData.lokers = [];
+            for (let i = 1; i <= 40; i++) {
+                allData.lokers.push({
+                    nomor: i,
+                    namaCustomer: '',
+                    pinLoker: '',
+                    status: 'belum',
+                    tanggal: '',
+                    petugas: '',
+                    fotoBase64: ''
+                });
+            }
+            await saveDataToGitHub();
+            selectLoker(1);
+            alert('Semua data telah dihapus!');
+        }
+    }
+}
+
+// Handle foto upload
+uploadFoto.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const base64 = event.target.result;
+            previewFoto.innerHTML = `<img src="${base64}" class="preview-img" onclick="zoomPhoto('${base64}')">`;
+            allData.lokers[currentLoker - 1].fotoBase64 = base64;
+        };
+        reader.readAsDataURL(file);
     }
 });
 
-function previewPhoto(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const preview = document.getElementById('fotoPreview');
-        const wrapper = document.getElementById('previewWrapper');
-        preview.src = e.target.result;
-        wrapper.style.display = 'inline-block';
-    };
-    reader.readAsDataURL(file);
-}
-
-document.getElementById('removePhoto').addEventListener('click', () => {
-    fotoInput.value = '';
-    document.getElementById('previewWrapper').style.display = 'none';
-    document.getElementById('fotoPreview').src = '';
-});
-
-// Modal close
-document.querySelector('.modal-close').onclick = () => {
-    document.getElementById('imageModal').style.display = 'none';
+// Zoom photo function (global)
+window.zoomPhoto = (src) => {
+    modalZoom.style.display = 'flex';
+    zoomImage.src = src;
 };
-window.onclick = (event) => {
-    const modal = document.getElementById('imageModal');
-    if (event.target === modal) {
-        modal.style.display = 'none';
+
+// Close modal
+document.querySelector('.close-modal').onclick = () => {
+    modalZoom.style.display = 'none';
+};
+
+modalZoom.onclick = (e) => {
+    if (e.target === modalZoom) {
+        modalZoom.style.display = 'none';
     }
 };
 
-// ==================== INITIALIZATION ====================
+// Navigation
+document.getElementById('prevNav').onclick = () => {
+    if (currentLoker > 1) selectLoker(currentLoker - 1);
+};
+document.getElementById('nextNav').onclick = () => {
+    if (currentLoker < 40) selectLoker(currentLoker + 1);
+};
 
-function init() {
-    loadFromLocalStorage();
-    addExportImportButtons();
-    console.log('🚀 Loker App Started!');
+// Event listeners
+btnSave.onclick = saveData;
+btnClearForm.onclick = clearForm;
+btnClearAllData.onclick = clearAllData;
+selectPetugas.onchange = () => {
+    petugasInput.value = selectPetugas.value;
+};
+
+// Auto sync setiap 30 detik
+function startAutoSync() {
+    if (syncInterval) clearInterval(syncInterval);
+    syncInterval = setInterval(() => {
+        loadDataFromGitHub();
+    }, 30000); // 30 detik
 }
 
-init();
+// Initialize
+loadDataFromGitHub().then(() => {
+    startAutoSync();
+    selectLoker(1);
+});
