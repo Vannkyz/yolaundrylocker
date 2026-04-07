@@ -3,7 +3,7 @@
 const GITHUB_CONFIG = {
     owner: 'vannkyz',      // Ganti dengan username GitHub Anda
     repo: 'yolaundrylocker',                  // Ganti dengan nama repository
-    token: 'github_pat_xxx_xxx',         // Ganti dengan Personal Access Token
+    token: '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',         // Ganti dengan Personal Access Token
     filePath: 'data/loker_data.json'     // Lokasi file di repository
 };
 
