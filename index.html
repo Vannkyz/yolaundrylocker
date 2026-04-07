@@ -10,13 +10,23 @@
 <body>
     <div class="container">
         <div class="sync-status" id="syncStatus">
-            <i class="fas fa-sync-alt fa-spin"></i> Menyinkronkan data...
+            <i class="fas fa-database"></i> Mode LocalStorage - Data tersimpan di browser ini
         </div>
         
         <header>
             <h1><i class="fas fa-archive"></i> Sistem Manajemen Loker</h1>
-            <p>40 Loker | Data Tersimpan di GitHub | Auto Sync Setiap 30 Detik</p>
+            <p>40 Loker | Data Tersimpan di Browser | Export/Import untuk sharing</p>
         </header>
+
+        <!-- Tombol Backup/Restore -->
+        <div class="backup-section">
+            <button class="btn-backup" id="btnExport"><i class="fas fa-download"></i> Export Data</button>
+            <label class="btn-restore" id="btnRestoreLabel">
+                <i class="fas fa-upload"></i> Import Data
+                <input type="file" id="fileImport" accept=".json" style="display: none;">
+            </label>
+            <button class="btn-sync" id="btnResetData"><i class="fas fa-undo-alt"></i> Reset ke Awal</button>
+        </div>
 
         <div class="petugas-section">
             <label><i class="fas fa-user-tie"></i> Pilih Petugas:</label>
@@ -27,18 +37,17 @@
                 <option value="Broery">Broery</option>
                 <option value="Jean">Jean</option>
             </select>
+            <span class="info-note"><i class="fas fa-info-circle"></i> Pilih petugas sebelum save</span>
         </div>
 
-        <!-- Navigasi Loker - Grid System (Tanpa Panah) -->
+        <!-- Navigasi Loker - Grid -->
         <div class="nav-loker-container">
-            <h3><i class="fas fa-door-open"></i> Pilih Loker</h3>
-            <div class="loker-grid" id="lokerGrid">
-                <!-- 40 tombol loker akan dibuat oleh JS -->
-            </div>
+            <h3><i class="fas fa-door-open"></i> Pilih Loker <span id="totalTerisi" class="total-badge">0/40 terisi</span></h3>
+            <div class="loker-grid" id="lokerGrid"></div>
         </div>
 
-        <div class="form-container" id="formContainer">
-            <h2 id="lokerTitle">
+        <div class="form-container">
+            <h2>
                 <i class="fas fa-locker"></i> 
                 Loker <span id="lokerNumber">1</span>
                 <span class="loker-status-badge" id="lokerStatusBadge"></span>
@@ -97,7 +106,6 @@
         <img class="modal-content" id="zoomImage">
     </div>
 
-    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
