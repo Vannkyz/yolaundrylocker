@@ -1,13 +1,12 @@
 // State Management
 let currentLoker = 1;
 let allData = null;
-let syncInterval = null;
-let isSaving = false;
 
 // DOM Elements
 const lokerGrid = document.getElementById('lokerGrid');
 const lokerNumber = document.getElementById('lokerNumber');
 const lokerStatusBadge = document.getElementById('lokerStatusBadge');
+const totalTerisi = document.getElementById('totalTerisi');
 const namaCustomer = document.getElementById('namaCustomer');
 const pinLoker = document.getElementById('pinLoker');
 const statusLoker = document.getElementById('statusLoker');
@@ -20,165 +19,86 @@ const dataDisplay = document.getElementById('dataDisplay');
 const btnSave = document.getElementById('btnSave');
 const btnClearForm = document.getElementById('btnClearForm');
 const btnClearAllData = document.getElementById('btnClearAllData');
-const syncStatus = document.getElementById('syncStatus');
+const btnExport = document.getElementById('btnExport');
+const btnResetData = document.getElementById('btnResetData');
+const fileImport = document.getElementById('fileImport');
 const modalZoom = document.getElementById('modalZoom');
 const zoomImage = document.getElementById('zoomImage');
 
-// ========== FUNGSI GITHUB API ==========
-async function loadDataFromGitHub() {
-    try {
-        syncStatus.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Mengambil data...';
-        syncStatus.className = 'sync-status syncing';
-        syncStatus.style.opacity = '1';
-        
-        const response = await fetch(API_URL, {
-            headers: {
-                'Authorization': `token ${GITHUB_CONFIG.token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
+// Data awal untuk 40 loker
+function getDefaultData() {
+    const lokers = [];
+    for (let i = 1; i <= 40; i++) {
+        lokers.push({
+            nomor: i,
+            namaCustomer: '',
+            pinLoker: '',
+            status: 'belum',
+            tanggal: '',
+            petugas: '',
+            fotoBase64: ''
         });
-
-        if (response.status === 404) {
-            await createInitialData();
-            return;
-        }
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        const content = atob(data.content);
-        allData = JSON.parse(content);
-        allData.sha = data.sha;
-        
-        updateUI();
-        syncStatus.innerHTML = '<i class="fas fa-check-circle"></i> Tersinkronasi';
-        syncStatus.className = 'sync-status synced';
-        
-        setTimeout(() => {
-            if (syncStatus.className !== 'syncing') {
-                syncStatus.style.opacity = '0';
-            }
-        }, 2000);
-    } catch (error) {
-        console.error('Error loading data:', error);
-        syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal sync, pakai data lokal';
-        syncStatus.className = 'sync-status error';
-        
-        const localData = localStorage.getItem('loker_backup');
-        if (localData) {
-            allData = JSON.parse(localData);
-            updateUI();
-        }
     }
+    return {
+        lastUpdated: new Date().toISOString(),
+        lokers: lokers
+    };
 }
 
-async function createInitialData() {
-    try {
-        const content = btoa(unescape(encodeURIComponent(JSON.stringify(DEFAULT_DATA, null, 2))));
-        
-        const response = await fetch(API_URL, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${GITHUB_CONFIG.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: 'Initial data for lockers',
-                content: content
-            })
-        });
-        
-        const result = await response.json();
-        allData = { ...DEFAULT_DATA };
-        if (result.content) allData.sha = result.content.sha;
-        
-        updateUI();
-    } catch (error) {
-        console.error('Error creating data:', error);
-        allData = { ...DEFAULT_DATA };
-        updateUI();
+// Load data dari LocalStorage
+function loadData() {
+    const savedData = localStorage.getItem('loker_data');
+    if (savedData) {
+        try {
+            allData = JSON.parse(savedData);
+            // Pastikan ada 40 loker
+            if (!allData.lokers || allData.lokers.length !== 40) {
+                allData = getDefaultData();
+            }
+        } catch(e) {
+            allData = getDefaultData();
+        }
+    } else {
+        allData = getDefaultData();
     }
+    updateUI();
 }
 
-async function saveDataToGitHub() {
-    if (isSaving) return;
-    isSaving = true;
+// Save data ke LocalStorage
+function saveToLocalStorage() {
+    allData.lastUpdated = new Date().toISOString();
+    localStorage.setItem('loker_data', JSON.stringify(allData));
     
-    try {
-        syncStatus.innerHTML = '<i class="fas fa-save"></i> Menyimpan...';
-        syncStatus.className = 'sync-status syncing';
-        syncStatus.style.opacity = '1';
-        
-        allData.lastUpdated = new Date().toISOString();
-        const content = btoa(unescape(encodeURIComponent(JSON.stringify(allData, null, 2))));
-        
-        const body = {
-            message: `Update data loker ${currentLoker} - ${new Date().toLocaleString()}`,
-            content: content,
-            sha: allData.sha
-        };
-        
-        const response = await fetch(API_URL, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${GITHUB_CONFIG.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const result = await response.json();
-        if (result.content) allData.sha = result.content.sha;
-        
-        localStorage.setItem('loker_backup', JSON.stringify(allData));
-        
-        syncStatus.innerHTML = '<i class="fas fa-check-circle"></i> Tersimpan!';
-        syncStatus.className = 'sync-status synced';
-        
-        setTimeout(() => {
-            if (syncStatus.className !== 'syncing') {
-                syncStatus.style.opacity = '0';
-            }
-        }, 2000);
-        
-    } catch (error) {
-        console.error('Error saving:', error);
-        syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal simpan';
-        syncStatus.className = 'sync-status error';
-        localStorage.setItem('loker_backup', JSON.stringify(allData));
-    } finally {
-        isSaving = false;
-    }
+    // Update status
+    const syncStatus = document.getElementById('syncStatus');
+    syncStatus.innerHTML = '<i class="fas fa-check-circle"></i> Data tersimpan di browser ini';
+    syncStatus.style.background = '#d4edda';
+    syncStatus.style.color = '#155724';
+    
+    setTimeout(() => {
+        syncStatus.style.background = '#e3f2fd';
+        syncStatus.style.color = '#1976d2';
+        syncStatus.innerHTML = '<i class="fas fa-database"></i> Mode LocalStorage - Data tersimpan di browser ini';
+    }, 2000);
 }
 
-// ========== FUNGSI NAVIGASI LOKER (GRID) ==========
+// Render grid loker
 function renderLokerGrid() {
     if (!allData) return;
     
     lokerGrid.innerHTML = '';
+    let filledCount = 0;
     
     for (let i = 1; i <= 40; i++) {
         const lokerData = allData.lokers[i - 1];
         const isFilled = lokerData && lokerData.namaCustomer && lokerData.namaCustomer.trim() !== '';
         
+        if (isFilled) filledCount++;
+        
         const btn = document.createElement('button');
         btn.className = 'loker-btn';
-        
-        // Tambah class filled jika sudah terisi data
-        if (isFilled) {
-            btn.classList.add('filled');
-        }
-        
-        // Tambah class active jika sedang dipilih
-        if (currentLoker === i) {
-            btn.classList.add('active');
-        }
+        if (isFilled) btn.classList.add('filled');
+        if (currentLoker === i) btn.classList.add('active');
         
         btn.innerHTML = `
             <span class="loker-num">${i}</span>
@@ -191,15 +111,17 @@ function renderLokerGrid() {
         
         lokerGrid.appendChild(btn);
     }
+    
+    totalTerisi.textContent = `${filledCount}/40 terisi`;
 }
 
+// Select loker
 function selectLoker(num) {
     currentLoker = num;
     lokerNumber.textContent = num;
     
-    // Update grid styling
-    const allLokerBtns = document.querySelectorAll('.loker-btn');
-    allLokerBtns.forEach((btn, index) => {
+    // Update active class
+    document.querySelectorAll('.loker-btn').forEach((btn, index) => {
         if (index + 1 === num) {
             btn.classList.add('active');
         } else {
@@ -207,11 +129,10 @@ function selectLoker(num) {
         }
     });
     
-    // Update form dengan data loker
+    // Update form
     const lokerData = allData.lokers[num - 1];
     const isFilled = lokerData && lokerData.namaCustomer && lokerData.namaCustomer.trim() !== '';
     
-    // Update status badge
     if (isFilled) {
         lokerStatusBadge.className = 'loker-status-badge filled';
         lokerStatusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Terisi';
@@ -235,38 +156,7 @@ function selectLoker(num) {
     displayData();
 }
 
-function updateUI() {
-    if (!allData) return;
-    renderLokerGrid();
-    displayData();
-    updateCurrentForm();
-}
-
-function updateCurrentForm() {
-    const lokerData = allData.lokers[currentLoker - 1];
-    const isFilled = lokerData && lokerData.namaCustomer && lokerData.namaCustomer.trim() !== '';
-    
-    if (isFilled) {
-        lokerStatusBadge.className = 'loker-status-badge filled';
-        lokerStatusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Terisi';
-    } else {
-        lokerStatusBadge.className = 'loker-status-badge';
-        lokerStatusBadge.innerHTML = '<i class="fas fa-circle"></i> Kosong';
-    }
-    
-    namaCustomer.value = lokerData.namaCustomer || '';
-    pinLoker.value = lokerData.pinLoker || '';
-    statusLoker.value = lokerData.status || 'belum';
-    tanggalLoker.value = lokerData.tanggal || '';
-    petugasInput.value = lokerData.petugas || '';
-    
-    if (lokerData.fotoBase64) {
-        previewFoto.innerHTML = `<img src="${lokerData.fotoBase64}" class="preview-img" onclick="zoomPhoto('${lokerData.fotoBase64}')">`;
-    } else {
-        previewFoto.innerHTML = '';
-    }
-}
-
+// Display data
 function displayData() {
     const lokerData = allData.lokers[currentLoker - 1];
     if (!lokerData) return;
@@ -312,7 +202,6 @@ function displayData() {
     `;
 }
 
-// Helper function untuk escape HTML
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -320,8 +209,39 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ========== FUNGSI FORM ==========
-async function saveData() {
+function updateUI() {
+    renderLokerGrid();
+    displayData();
+    updateCurrentForm();
+}
+
+function updateCurrentForm() {
+    const lokerData = allData.lokers[currentLoker - 1];
+    const isFilled = lokerData && lokerData.namaCustomer && lokerData.namaCustomer.trim() !== '';
+    
+    if (isFilled) {
+        lokerStatusBadge.className = 'loker-status-badge filled';
+        lokerStatusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Terisi';
+    } else {
+        lokerStatusBadge.className = 'loker-status-badge';
+        lokerStatusBadge.innerHTML = '<i class="fas fa-circle"></i> Kosong';
+    }
+    
+    namaCustomer.value = lokerData.namaCustomer || '';
+    pinLoker.value = lokerData.pinLoker || '';
+    statusLoker.value = lokerData.status || 'belum';
+    tanggalLoker.value = lokerData.tanggal || '';
+    petugasInput.value = lokerData.petugas || '';
+    
+    if (lokerData.fotoBase64) {
+        previewFoto.innerHTML = `<img src="${lokerData.fotoBase64}" class="preview-img" onclick="zoomPhoto('${lokerData.fotoBase64}')">`;
+    } else {
+        previewFoto.innerHTML = '';
+    }
+}
+
+// Save data
+function saveData() {
     const pin = pinLoker.value.trim();
     if (pin && pin.length < 4) {
         alert('PIN minimal 4 digit!');
@@ -348,21 +268,23 @@ async function saveData() {
         fotoBase64: allData.lokers[currentLoker - 1]?.fotoBase64 || ''
     };
     
-    await saveDataToGitHub();
-    
-    // Update UI
+    saveToLocalStorage();
     renderLokerGrid();
     displayData();
     updateCurrentForm();
     
     uploadFoto.value = '';
     
-    // Efek animasi
-    const formContainer = document.querySelector('.form-container');
-    formContainer.classList.add('saving-effect');
-    setTimeout(() => formContainer.classList.remove('saving-effect'), 500);
+    // Efek notifikasi
+    const btn = document.getElementById('btnSave');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Tersimpan!';
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+    }, 1000);
 }
 
+// Clear form
 function clearForm() {
     namaCustomer.value = '';
     pinLoker.value = '';
@@ -372,22 +294,12 @@ function clearForm() {
     uploadFoto.value = '';
 }
 
-async function clearAllData() {
+// Clear all data
+function clearAllData() {
     if (confirm('⚠️ PERINGATAN! Ini akan menghapus SEMUA data dari 40 loker. Lanjutkan?')) {
-        if (confirm('Data akan dihapus PERMANEN dari GitHub. Yakin ingin melanjutkan?')) {
-            allData.lokers = [];
-            for (let i = 1; i <= 40; i++) {
-                allData.lokers.push({
-                    nomor: i,
-                    namaCustomer: '',
-                    pinLoker: '',
-                    status: 'belum',
-                    tanggal: '',
-                    petugas: '',
-                    fotoBase64: ''
-                });
-            }
-            await saveDataToGitHub();
+        if (confirm('Data akan dihapus PERMANEN. Yakin?')) {
+            allData = getDefaultData();
+            saveToLocalStorage();
             renderLokerGrid();
             selectLoker(1);
             alert('✅ Semua data telah dihapus!');
@@ -395,7 +307,53 @@ async function clearAllData() {
     }
 }
 
-// Handle foto upload
+// Export data
+function exportData() {
+    const dataStr = JSON.stringify(allData, null, 2);
+    const blob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup_loker_${new Date().toISOString().slice(0,19)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    alert('Data berhasil diexport!');
+}
+
+// Import data
+function importData(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            if (importedData.lokers && importedData.lokers.length === 40) {
+                allData = importedData;
+                saveToLocalStorage();
+                renderLokerGrid();
+                selectLoker(1);
+                alert('✅ Import data berhasil!');
+            } else {
+                alert('File tidak valid! Pastikan file backup yang benar.');
+            }
+        } catch(err) {
+            alert('Gagal membaca file: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Reset data
+function resetData() {
+    if (confirm('Reset semua data ke kondisi awal? Semua data akan hilang!')) {
+        allData = getDefaultData();
+        saveToLocalStorage();
+        renderLokerGrid();
+        selectLoker(1);
+        alert('Data telah direset!');
+    }
+}
+
+// Foto upload
 uploadFoto.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -415,7 +373,7 @@ uploadFoto.addEventListener('change', (e) => {
     }
 });
 
-// Zoom photo function
+// Zoom photo
 window.zoomPhoto = (src) => {
     modalZoom.style.display = 'flex';
     zoomImage.src = src;
@@ -436,20 +394,18 @@ modalZoom.onclick = (e) => {
 btnSave.onclick = saveData;
 btnClearForm.onclick = clearForm;
 btnClearAllData.onclick = clearAllData;
+btnExport.onclick = exportData;
+btnResetData.onclick = resetData;
 selectPetugas.onchange = () => {
     petugasInput.value = selectPetugas.value;
 };
-
-// Auto sync setiap 30 detik
-function startAutoSync() {
-    if (syncInterval) clearInterval(syncInterval);
-    syncInterval = setInterval(() => {
-        loadDataFromGitHub();
-    }, 30000);
-}
+fileImport.onchange = (e) => {
+    if (e.target.files[0]) {
+        importData(e.target.files[0]);
+        fileImport.value = '';
+    }
+};
 
 // Initialize
-loadDataFromGitHub().then(() => {
-    startAutoSync();
-    selectLoker(1);
-});
+loadData();
+selectLoker(1);
