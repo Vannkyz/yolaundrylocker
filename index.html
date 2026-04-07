@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Sistem Manajemen Loker - 40 Locker</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -10,7 +10,7 @@
 <body>
     <div class="container">
         <div class="sync-status" id="syncStatus">
-            <i class="fas fa-sync-alt"></i> Menyinkronkan data...
+            <i class="fas fa-sync-alt fa-spin"></i> Menyinkronkan data...
         </div>
         
         <header>
@@ -29,14 +29,20 @@
             </select>
         </div>
 
-        <div class="nav-loker">
-            <button class="nav-btn" id="prevNav"><i class="fas fa-chevron-left"></i></button>
-            <div class="loker-nav-list" id="lokerNavList"></div>
-            <button class="nav-btn" id="nextNav"><i class="fas fa-chevron-right"></i></button>
+        <!-- Navigasi Loker - Grid System (Tanpa Panah) -->
+        <div class="nav-loker-container">
+            <h3><i class="fas fa-door-open"></i> Pilih Loker</h3>
+            <div class="loker-grid" id="lokerGrid">
+                <!-- 40 tombol loker akan dibuat oleh JS -->
+            </div>
         </div>
 
         <div class="form-container" id="formContainer">
-            <h2 id="lokerTitle">Loker <span id="lokerNumber">1</span></h2>
+            <h2 id="lokerTitle">
+                <i class="fas fa-locker"></i> 
+                Loker <span id="lokerNumber">1</span>
+                <span class="loker-status-badge" id="lokerStatusBadge"></span>
+            </h2>
             
             <div class="form-group">
                 <label><i class="fas fa-user"></i> Nama Customer:</label>
@@ -81,7 +87,7 @@
         </div>
 
         <div class="data-viewer">
-            <h3><i class="fas fa-database"></i> Data Loker Terpilih</h3>
+            <h3><i class="fas fa-database"></i> Detail Data Loker</h3>
             <div id="dataDisplay" class="data-card"></div>
         </div>
     </div>
