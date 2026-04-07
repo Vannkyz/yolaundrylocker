@@ -5,8 +5,9 @@ let syncInterval = null;
 let isSaving = false;
 
 // DOM Elements
-const lokerNavList = document.getElementById('lokerNavList');
+const lokerGrid = document.getElementById('lokerGrid');
 const lokerNumber = document.getElementById('lokerNumber');
+const lokerStatusBadge = document.getElementById('lokerStatusBadge');
 const namaCustomer = document.getElementById('namaCustomer');
 const pinLoker = document.getElementById('pinLoker');
 const statusLoker = document.getElementById('statusLoker');
@@ -28,6 +29,7 @@ async function loadDataFromGitHub() {
     try {
         syncStatus.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Mengambil data...';
         syncStatus.className = 'sync-status syncing';
+        syncStatus.style.opacity = '1';
         
         const response = await fetch(API_URL, {
             headers: {
@@ -37,16 +39,17 @@ async function loadDataFromGitHub() {
         });
 
         if (response.status === 404) {
-            // File belum ada, buat baru
             await createInitialData();
             return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
 
         const data = await response.json();
         const content = atob(data.content);
         allData = JSON.parse(content);
-        
-        // Update SHA untuk commit berikutnya
         allData.sha = data.sha;
         
         updateUI();
@@ -60,10 +63,9 @@ async function loadDataFromGitHub() {
         }, 2000);
     } catch (error) {
         console.error('Error loading data:', error);
-        syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal sync, coba lagi';
+        syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal sync, pakai data lokal';
         syncStatus.className = 'sync-status error';
         
-        // Fallback ke local storage jika offline
         const localData = localStorage.getItem('loker_backup');
         if (localData) {
             allData = JSON.parse(localData);
@@ -74,10 +76,9 @@ async function loadDataFromGitHub() {
 
 async function createInitialData() {
     try {
-        // Buat folder data dulu
-        const content = btoa(JSON.stringify(DEFAULT_DATA, null, 2));
+        const content = btoa(unescape(encodeURIComponent(JSON.stringify(DEFAULT_DATA, null, 2))));
         
-        await fetch(API_URL, {
+        const response = await fetch(API_URL, {
             method: 'PUT',
             headers: {
                 'Authorization': `token ${GITHUB_CONFIG.token}`,
@@ -89,7 +90,10 @@ async function createInitialData() {
             })
         });
         
+        const result = await response.json();
         allData = { ...DEFAULT_DATA };
+        if (result.content) allData.sha = result.content.sha;
+        
         updateUI();
     } catch (error) {
         console.error('Error creating data:', error);
@@ -125,10 +129,13 @@ async function saveDataToGitHub() {
             body: JSON.stringify(body)
         });
         
-        const result = await response.json();
-        allData.sha = result.content.sha;
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
         
-        // Backup ke local storage
+        const result = await response.json();
+        if (result.content) allData.sha = result.content.sha;
+        
         localStorage.setItem('loker_backup', JSON.stringify(allData));
         
         syncStatus.innerHTML = '<i class="fas fa-check-circle"></i> Tersimpan!';
@@ -144,67 +151,75 @@ async function saveDataToGitHub() {
         console.error('Error saving:', error);
         syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal simpan';
         syncStatus.className = 'sync-status error';
-        
-        // Backup ke local storage
         localStorage.setItem('loker_backup', JSON.stringify(allData));
     } finally {
         isSaving = false;
     }
 }
 
-// ========== FUNGSI UTAMA ==========
-function updateUI() {
+// ========== FUNGSI NAVIGASI LOKER (GRID) ==========
+function renderLokerGrid() {
     if (!allData) return;
     
-    // Update navigasi
-    renderNavButtons();
+    lokerGrid.innerHTML = '';
     
-    // Update form dengan data loker saat ini
-    const lokerData = allData.lokers[currentLoker - 1];
-    if (lokerData) {
-        namaCustomer.value = lokerData.namaCustomer || '';
-        pinLoker.value = lokerData.pinLoker || '';
-        statusLoker.value = lokerData.status || 'belum';
-        tanggalLoker.value = lokerData.tanggal || '';
-        petugasInput.value = lokerData.petugas || '';
+    for (let i = 1; i <= 40; i++) {
+        const lokerData = allData.lokers[i - 1];
+        const isFilled = lokerData && lokerData.namaCustomer && lokerData.namaCustomer.trim() !== '';
         
-        // Tampilkan foto jika ada
-        if (lokerData.fotoBase64) {
-            previewFoto.innerHTML = `<img src="${lokerData.fotoBase64}" class="preview-img" onclick="zoomPhoto('${lokerData.fotoBase64}')">`;
-        } else {
-            previewFoto.innerHTML = '';
+        const btn = document.createElement('button');
+        btn.className = 'loker-btn';
+        
+        // Tambah class filled jika sudah terisi data
+        if (isFilled) {
+            btn.classList.add('filled');
         }
         
-        // Update display data
-        displayData();
-    }
-}
-
-function renderNavButtons() {
-    lokerNavList.innerHTML = '';
-    for (let i = 1; i <= 40; i++) {
-        const btn = document.createElement('button');
-        btn.className = `loker-nav-btn ${currentLoker === i ? 'active' : ''}`;
-        
-        const lokerData = allData.lokers[i - 1];
-        const hasData = lokerData && lokerData.namaCustomer;
+        // Tambah class active jika sedang dipilih
+        if (currentLoker === i) {
+            btn.classList.add('active');
+        }
         
         btn.innerHTML = `
             <span class="loker-num">${i}</span>
-            ${hasData ? '<i class="fas fa-check-circle has-data"></i>' : ''}
+            <i class="loker-icon ${isFilled ? 'fas fa-check-circle' : 'far fa-circle'}"></i>
         `;
         
-        btn.onclick = () => selectLoker(i);
-        lokerNavList.appendChild(btn);
+        btn.onclick = (function(lokerNum) {
+            return function() { selectLoker(lokerNum); };
+        })(i);
+        
+        lokerGrid.appendChild(btn);
     }
 }
 
 function selectLoker(num) {
     currentLoker = num;
     lokerNumber.textContent = num;
-    renderNavButtons();
     
+    // Update grid styling
+    const allLokerBtns = document.querySelectorAll('.loker-btn');
+    allLokerBtns.forEach((btn, index) => {
+        if (index + 1 === num) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // Update form dengan data loker
     const lokerData = allData.lokers[num - 1];
+    const isFilled = lokerData && lokerData.namaCustomer && lokerData.namaCustomer.trim() !== '';
+    
+    // Update status badge
+    if (isFilled) {
+        lokerStatusBadge.className = 'loker-status-badge filled';
+        lokerStatusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Terisi';
+    } else {
+        lokerStatusBadge.className = 'loker-status-badge';
+        lokerStatusBadge.innerHTML = '<i class="fas fa-circle"></i> Kosong';
+    }
+    
     namaCustomer.value = lokerData.namaCustomer || '';
     pinLoker.value = lokerData.pinLoker || '';
     statusLoker.value = lokerData.status || 'belum';
@@ -220,39 +235,71 @@ function selectLoker(num) {
     displayData();
 }
 
+function updateUI() {
+    if (!allData) return;
+    renderLokerGrid();
+    displayData();
+    updateCurrentForm();
+}
+
+function updateCurrentForm() {
+    const lokerData = allData.lokers[currentLoker - 1];
+    const isFilled = lokerData && lokerData.namaCustomer && lokerData.namaCustomer.trim() !== '';
+    
+    if (isFilled) {
+        lokerStatusBadge.className = 'loker-status-badge filled';
+        lokerStatusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Terisi';
+    } else {
+        lokerStatusBadge.className = 'loker-status-badge';
+        lokerStatusBadge.innerHTML = '<i class="fas fa-circle"></i> Kosong';
+    }
+    
+    namaCustomer.value = lokerData.namaCustomer || '';
+    pinLoker.value = lokerData.pinLoker || '';
+    statusLoker.value = lokerData.status || 'belum';
+    tanggalLoker.value = lokerData.tanggal || '';
+    petugasInput.value = lokerData.petugas || '';
+    
+    if (lokerData.fotoBase64) {
+        previewFoto.innerHTML = `<img src="${lokerData.fotoBase64}" class="preview-img" onclick="zoomPhoto('${lokerData.fotoBase64}')">`;
+    } else {
+        previewFoto.innerHTML = '';
+    }
+}
+
 function displayData() {
     const lokerData = allData.lokers[currentLoker - 1];
     if (!lokerData) return;
     
-    const hasData = lokerData.namaCustomer;
+    const hasData = lokerData.namaCustomer && lokerData.namaCustomer.trim() !== '';
     
     if (!hasData) {
-        dataDisplay.innerHTML = '<p class="empty-data"><i class="fas fa-inbox"></i><br>Belum ada data untuk loker ini</p>';
+        dataDisplay.innerHTML = '<div class="empty-data"><i class="fas fa-inbox"></i><br>Belum ada data untuk loker ini</div>';
         return;
     }
     
     dataDisplay.innerHTML = `
         <div class="data-item">
-            <strong><i class="fas fa-user"></i> Nama:</strong> 
-            <span>${lokerData.namaCustomer || '-'}</span>
+            <strong><i class="fas fa-user"></i> Nama Customer:</strong>
+            <span>${escapeHtml(lokerData.namaCustomer)}</span>
         </div>
         <div class="data-item">
-            <strong><i class="fas fa-tag"></i> PIN:</strong> 
-            <span>${lokerData.pinLoker || '-'}</span>
+            <strong><i class="fas fa-tag"></i> PIN Loker:</strong>
+            <span>${escapeHtml(lokerData.pinLoker) || '-'}</span>
         </div>
         <div class="data-item">
-            <strong><i class="fas fa-check-circle"></i> Status:</strong> 
+            <strong><i class="fas fa-check-circle"></i> Status:</strong>
             <span class="status-badge ${lokerData.status === 'sudah' ? 'status-taken' : 'status-pending'}">
                 ${lokerData.status === 'sudah' ? '✓ Sudah Diambil' : '⏳ Belum Diambil'}
             </span>
         </div>
         <div class="data-item">
-            <strong><i class="fas fa-calendar"></i> Tanggal:</strong> 
-            <span>${lokerData.tanggal || '-'}</span>
+            <strong><i class="fas fa-calendar-alt"></i> Tanggal:</strong>
+            <span>${escapeHtml(lokerData.tanggal) || '-'}</span>
         </div>
         <div class="data-item">
-            <strong><i class="fas fa-user-check"></i> Petugas:</strong> 
-            <span>${lokerData.petugas || '-'}</span>
+            <strong><i class="fas fa-user-check"></i> Petugas:</strong>
+            <span>${escapeHtml(lokerData.petugas) || '-'}</span>
         </div>
         ${lokerData.fotoBase64 ? `
             <div class="data-item">
@@ -265,27 +312,31 @@ function displayData() {
     `;
 }
 
+// Helper function untuk escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // ========== FUNGSI FORM ==========
 async function saveData() {
-    // Validasi PIN minimal 4 digit
     const pin = pinLoker.value.trim();
     if (pin && pin.length < 4) {
         alert('PIN minimal 4 digit!');
         return;
     }
     
-    // Validasi petugas
     const petugas = selectPetugas.value;
     if (!petugas) {
         alert('Silakan pilih petugas terlebih dahulu!');
         return;
     }
     
-    // Get current date
     const now = new Date();
-    const tanggal = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
+    const tanggal = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
     
-    // Update data
     allData.lokers[currentLoker - 1] = {
         ...allData.lokers[currentLoker - 1],
         nomor: currentLoker,
@@ -298,11 +349,18 @@ async function saveData() {
     };
     
     await saveDataToGitHub();
-    renderNavButtons();
-    displayData();
     
-    // Reset upload foto jika sudah disimpan
+    // Update UI
+    renderLokerGrid();
+    displayData();
+    updateCurrentForm();
+    
     uploadFoto.value = '';
+    
+    // Efek animasi
+    const formContainer = document.querySelector('.form-container');
+    formContainer.classList.add('saving-effect');
+    setTimeout(() => formContainer.classList.remove('saving-effect'), 500);
 }
 
 function clearForm() {
@@ -310,14 +368,13 @@ function clearForm() {
     pinLoker.value = '';
     statusLoker.value = 'belum';
     tanggalLoker.value = '';
-    // Petugas tetap dari dropdown
     previewFoto.innerHTML = '';
     uploadFoto.value = '';
 }
 
 async function clearAllData() {
-    if (confirm('PERINGATAN! Ini akan menghapus SEMUA data dari 40 loker. Lanjutkan?')) {
-        if (confirm('Data akan dihapus PERMANEN dari GitHub. Yakin?')) {
+    if (confirm('⚠️ PERINGATAN! Ini akan menghapus SEMUA data dari 40 loker. Lanjutkan?')) {
+        if (confirm('Data akan dihapus PERMANEN dari GitHub. Yakin ingin melanjutkan?')) {
             allData.lokers = [];
             for (let i = 1; i <= 40; i++) {
                 allData.lokers.push({
@@ -331,8 +388,9 @@ async function clearAllData() {
                 });
             }
             await saveDataToGitHub();
+            renderLokerGrid();
             selectLoker(1);
-            alert('Semua data telah dihapus!');
+            alert('✅ Semua data telah dihapus!');
         }
     }
 }
@@ -341,6 +399,12 @@ async function clearAllData() {
 uploadFoto.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Ukuran foto maksimal 5MB!');
+            uploadFoto.value = '';
+            return;
+        }
+        
         const reader = new FileReader();
         reader.onload = function(event) {
             const base64 = event.target.result;
@@ -351,7 +415,7 @@ uploadFoto.addEventListener('change', (e) => {
     }
 });
 
-// Zoom photo function (global)
+// Zoom photo function
 window.zoomPhoto = (src) => {
     modalZoom.style.display = 'flex';
     zoomImage.src = src;
@@ -368,14 +432,6 @@ modalZoom.onclick = (e) => {
     }
 };
 
-// Navigation
-document.getElementById('prevNav').onclick = () => {
-    if (currentLoker > 1) selectLoker(currentLoker - 1);
-};
-document.getElementById('nextNav').onclick = () => {
-    if (currentLoker < 40) selectLoker(currentLoker + 1);
-};
-
 // Event listeners
 btnSave.onclick = saveData;
 btnClearForm.onclick = clearForm;
@@ -389,7 +445,7 @@ function startAutoSync() {
     if (syncInterval) clearInterval(syncInterval);
     syncInterval = setInterval(() => {
         loadDataFromGitHub();
-    }, 30000); // 30 detik
+    }, 30000);
 }
 
 // Initialize
