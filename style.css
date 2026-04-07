@@ -28,43 +28,60 @@ body {
 
 /* Sync Status */
 .sync-status {
-    background: #f0f0f0;
+    background: #e3f2fd;
+    color: #1976d2;
     padding: 10px 20px;
     text-align: center;
     font-size: 14px;
+    font-weight: bold;
+}
+
+/* Backup Section */
+.backup-section {
+    padding: 15px 30px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn-backup, .btn-restore, .btn-sync {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
     transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    border: 2px solid #667eea;
+    color: #667eea;
 }
 
-.sync-status.syncing {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.sync-status.synced {
-    background: #d4edda;
-    color: #155724;
-}
-
-.sync-status.error {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-/* Header */
-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.btn-backup:hover, .btn-restore:hover, .btn-sync:hover {
+    background: #667eea;
     color: white;
-    padding: 30px;
-    text-align: center;
+    transform: translateY(-2px);
 }
 
-header h1 {
-    font-size: 2em;
-    margin-bottom: 10px;
+.info-note {
+    font-size: 12px;
+    color: #666;
+    margin-left: auto;
 }
 
-header p {
-    opacity: 0.9;
+.total-badge {
+    background: #667eea;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    margin-left: 10px;
 }
 
 /* Petugas Section */
@@ -89,7 +106,6 @@ header p {
     border-radius: 8px;
     font-size: 14px;
     cursor: pointer;
-    transition: all 0.3s;
     background: white;
 }
 
@@ -97,7 +113,7 @@ header p {
     border-color: #667eea;
 }
 
-/* Navigasi Loker - Grid System */
+/* Navigasi Loker Grid */
 .nav-loker-container {
     padding: 20px 30px;
     background: white;
@@ -107,22 +123,20 @@ header p {
 .nav-loker-container h3 {
     margin-bottom: 15px;
     color: #333;
-    font-size: 1.1em;
 }
 
 .loker-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(70px, 85px));
+    grid-template-columns: repeat(auto-fill, minmax(75px, 85px));
     gap: 12px;
     justify-content: center;
-    max-height: 280px;
+    max-height: 300px;
     overflow-y: auto;
     padding: 10px 5px;
     background: #fafafa;
     border-radius: 12px;
 }
 
-/* Scrollbar Styling */
 .loker-grid::-webkit-scrollbar {
     width: 8px;
 }
@@ -135,10 +149,6 @@ header p {
 .loker-grid::-webkit-scrollbar-thumb {
     background: #667eea;
     border-radius: 10px;
-}
-
-.loker-grid::-webkit-scrollbar-thumb:hover {
-    background: #764ba2;
 }
 
 /* Tombol Loker */
@@ -155,7 +165,6 @@ header p {
     transition: all 0.3s ease;
     font-weight: bold;
     gap: 5px;
-    position: relative;
 }
 
 .loker-btn:hover {
@@ -163,26 +172,20 @@ header p {
     box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-/* Loker Aktif/Terpilih */
 .loker-btn.active {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border-color: #667eea;
-    transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(102,126,234,0.3);
 }
 
-/* Loker yang Sudah Terisi Data (WARNA HIJAU) */
 .loker-btn.filled {
     background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
     color: white;
     border-color: #28a745;
 }
 
-/* Loker yang sudah terisi DAN sedang aktif */
 .loker-btn.filled.active {
     background: linear-gradient(135deg, #1e7e34 0%, #18a05a 100%);
-    border-color: #155724;
 }
 
 .loker-num {
@@ -191,14 +194,10 @@ header p {
 }
 
 .loker-icon {
-    font-size: 14px;
+    font-size: 12px;
 }
 
-.loker-btn.filled .loker-icon:before {
-    content: "✓";
-}
-
-/* Form Container */
+/* Form */
 .form-container {
     padding: 30px;
     background: #fafafa;
@@ -215,7 +214,7 @@ header p {
 
 .loker-status-badge {
     font-size: 12px;
-    padding: 4px 10px;
+    padding: 4px 12px;
     border-radius: 20px;
     background: #e0e0e0;
     color: #666;
@@ -256,7 +255,6 @@ header p {
 
 .form-group input:read-only {
     background: #f5f5f5;
-    cursor: default;
 }
 
 .form-group small {
@@ -276,7 +274,6 @@ header p {
     max-height: 200px;
     border-radius: 10px;
     cursor: pointer;
-    transition: transform 0.3s;
     border: 2px solid #e0e0e0;
 }
 
@@ -388,13 +385,6 @@ header p {
     max-width: 150px;
     border-radius: 8px;
     cursor: pointer;
-    transition: transform 0.3s;
-    border: 2px solid #e0e0e0;
-}
-
-.saved-img:hover {
-    transform: scale(1.05);
-    border-color: #667eea;
 }
 
 .empty-data {
@@ -408,7 +398,7 @@ header p {
     margin-bottom: 10px;
 }
 
-/* Modal Zoom */
+/* Modal */
 .modal {
     display: none;
     position: fixed;
@@ -442,12 +432,10 @@ header p {
     color: white;
     font-size: 40px;
     cursor: pointer;
-    transition: 0.3s;
 }
 
 .close-modal:hover {
     color: #ccc;
-    transform: scale(1.1);
 }
 
 /* Responsive */
@@ -456,14 +444,9 @@ header p {
         padding: 10px;
     }
     
-    .container {
-        margin: 0;
-    }
-    
     .loker-grid {
-        grid-template-columns: repeat(auto-fill, minmax(60px, 70px));
+        grid-template-columns: repeat(auto-fill, minmax(60px, 65px));
         gap: 8px;
-        max-height: 250px;
     }
     
     .loker-btn {
@@ -492,33 +475,11 @@ header p {
         min-width: auto;
     }
     
-    .petugas-section {
+    .backup-section {
         flex-direction: column;
-        align-items: stretch;
     }
     
-    header h1 {
-        font-size: 1.5em;
+    .btn-backup, .btn-restore, .btn-sync {
+        justify-content: center;
     }
-}
-
-@media (max-width: 480px) {
-    .loker-grid {
-        grid-template-columns: repeat(auto-fill, minmax(55px, 60px));
-        gap: 6px;
-    }
-    
-    .form-container, .data-viewer, .nav-loker-container {
-        padding: 15px;
-    }
-}
-
-/* Animasi tambahan */
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-
-.saving-effect {
-    animation: pulse 0.5s ease;
 }
